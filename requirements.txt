@@ -1,0 +1,26 @@
+# Core Dependencies
+numpy==1.24.3
+opencv-python==4.8.1.78
+pillow==10.1.0
+
+# ML Runtime
+onnxruntime==1.16.3
+openvino==2023.2.0
+
+# Database
+lancedb==0.3.3
+
+# ML Models & Utilities
+transformers==4.36.0
+torch==2.1.0
+# Note: Install PyTorch with: pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Utilities
+requests==2.31.0
+tqdm==4.66.1
+python-dotenv==1.0.0
+
+# Development (optional)
+pytest==7.4.3
+black==23.12.0
+flake8==6.1.0

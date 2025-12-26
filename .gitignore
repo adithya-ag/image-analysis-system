@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project-specific: Large Data Files
+data/
+!data/.gitkeep
+!data/README.md
+
+# Project-specific: Models (large binary files)
+models/*.onnx
+models/*.bin
+models/*.pt
+models/*.pth
+!models/.gitkeep
+!models/README.md
+
+# Project-specific: Databases
+databases/*.db
+databases/*.db-journal
+databases/*.lance/
+!databases/.gitkeep
+!databases/README.md
+
+# Project-specific: Outputs
+outputs/
+logs/
+*.log
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment Variables
+.env
+.env.local
+
+# OS
+Thumbs.db
