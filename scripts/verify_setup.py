@@ -25,19 +25,19 @@ class SetupVerifier:
     def check(self, name, condition, error_msg=None, warning=False):
         """Check a condition and print result"""
         if condition:
-            print(f"✅ {name}")
+            print(f"[OK] {name}")
             self.checks_passed += 1
             return True
         else:
             if warning:
-                print(f"⚠️  {name}")
+                print(f"[WARN] {name}")
                 if error_msg:
-                    print(f"   └─ {error_msg}")
+                    print(f"   -> {error_msg}")
                 self.warnings.append(name)
             else:
-                print(f"❌ {name}")
+                print(f"[FAIL] {name}")
                 if error_msg:
-                    print(f"   └─ {error_msg}")
+                    print(f"   -> {error_msg}")
                 self.checks_failed += 1
             return False
     
@@ -117,20 +117,24 @@ class SetupVerifier:
     def check_models(self):
         """Check if models are downloaded"""
         models_dir = PROJECT_ROOT / "models"
-        
-        model_files = ['smolvlm_500m.onnx', 'mobileclip_s2.onnx']
-        models_exist = []
-        
-        for model_file in model_files:
-            model_path = models_dir / model_file
-            exists = model_path.exists() and model_path.stat().st_size > 1024  # >1KB (not placeholder)
-            models_exist.append(exists)
-            
+
+        # v0.1: CLIP ViT-B/32 only (SmolVLM and MobileCLIP deferred to v0.2)
+        clip_model_path = models_dir / "clip_vit_b32" / "model.onnx"
+        exists = clip_model_path.exists() and clip_model_path.stat().st_size > 1024 * 1024  # >1MB
+
+        if exists:
+            size_mb = clip_model_path.stat().st_size / (1024 * 1024)
             self.check(
-                f"Model: {model_file}",
-                exists,
-                f"Run: python scripts/setup_models.py",
-                warning=True  # Models are optional for initial setup
+                f"Model: CLIP ViT-B/32 ({size_mb:.1f} MB)",
+                True,
+                None
+            )
+        else:
+            self.check(
+                "Model: CLIP ViT-B/32",
+                False,
+                "Run: python scripts/setup_models.py",
+                warning=True
             )
     
     def check_test_images(self):
@@ -181,57 +185,57 @@ class SetupVerifier:
     def print_summary(self):
         """Print verification summary"""
         print("\n" + "=" * 60)
-        print("📊 VERIFICATION SUMMARY")
+        print("VERIFICATION SUMMARY")
         print("=" * 60)
-        print(f"✅ Checks passed: {self.checks_passed}")
-        print(f"❌ Checks failed: {self.checks_failed}")
-        print(f"⚠️  Warnings: {len(self.warnings)}")
-        
+        print(f"[OK] Checks passed: {self.checks_passed}")
+        print(f"[FAIL] Checks failed: {self.checks_failed}")
+        print(f"[WARN] Warnings: {len(self.warnings)}")
+
         if self.checks_failed == 0:
-            print("\n🎉 Setup complete! Ready for Phase 1 implementation.")
+            print("\n*** Setup complete! Ready for Phase 1 implementation. ***")
         else:
-            print("\n⚠️  Some checks failed. Please address the issues above.")
-        
+            print("\n[!] Some checks failed. Please address the issues above.")
+
         if self.warnings:
-            print("\n⚠️  Warnings (optional but recommended):")
+            print("\n[!] Warnings (optional but recommended):")
             for warning in self.warnings:
                 print(f"   - {warning}")
-        
+
         print("=" * 60)
     
     def run(self):
         """Run all verification checks"""
         print("=" * 60)
-        print("🔍 SETUP VERIFICATION")
+        print("SETUP VERIFICATION")
         print("=" * 60)
         print()
-        
-        print("📌 Python Environment")
+
+        print("[1] Python Environment")
         self.check_python_version()
         self.check_virtual_env()
         print()
-        
-        print("📦 Dependencies")
+
+        print("[2] Dependencies")
         self.check_dependencies()
         print()
-        
-        print("📁 Project Structure")
+
+        print("[3] Project Structure")
         self.check_directory_structure()
         print()
-        
-        print("🤖 Models")
+
+        print("[4] Models")
         self.check_models()
         print()
-        
-        print("🖼️  Test Data")
+
+        print("[5] Test Data")
         self.check_test_images()
         print()
-        
-        print("💾 Databases")
+
+        print("[6] Databases")
         self.check_databases()
-        
+
         self.print_summary()
-        
+
         return 0 if self.checks_failed == 0 else 1
 
 

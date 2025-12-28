@@ -25,6 +25,7 @@
 Since you forgot to add Python 3.11 to PATH during installation:
 
 ### Option A: Re-run Installer (Recommended)
+
 1. Find the Python 3.11.9 installer you downloaded
 2. Run it again
 3. Choose **"Modify"**
@@ -33,6 +34,7 @@ Since you forgot to add Python 3.11 to PATH during installation:
 6. Click **Install**
 
 ### Option B: Manual PATH Setup
+
 1. Find your Python 3.11 installation directory (usually `C:\Users\YourName\AppData\Local\Programs\Python\Python311`)
 2. Press `Win + X` → **System** → **Advanced system settings**
 3. Click **Environment Variables**
@@ -43,7 +45,9 @@ Since you forgot to add Python 3.11 to PATH during installation:
 8. **Restart your terminal/IDE**
 
 ### Verify Python 3.11 is Working
+
 Open **new** Command Prompt or PowerShell:
+
 ```bash
 python --version
 # Should show: Python 3.11.x
@@ -56,6 +60,7 @@ If it still shows 3.13, use `py -3.11 --version` to check if 3.11 is available.
 ## 2. Project Setup
 
 ### Create Project Directory
+
 Open **Command Prompt** or **PowerShell** and run:
 
 ```bash
@@ -68,6 +73,7 @@ cd image-analysis-system
 ```
 
 ### Download Project Files
+
 Once GitHub repo is set up (see section 3), you'll clone it here. For now, we'll create the structure manually.
 
 ---
@@ -79,7 +85,7 @@ Once GitHub repo is set up (see section 3), you'll clone it here. For now, we'll
 1. **Go to GitHub:** https://github.com/new
 2. **Repository name:** `image-analysis-system` (or your preferred name)
 3. **Description:** "Local-first image analysis with semantic search using vision models"
-4. **Visibility:** 
+4. **Visibility:**
    - Private (for now during development)
    - Public (when ready for open source release)
 5. **Initialize repository:**
@@ -104,11 +110,13 @@ cd image-analysis-system
 Since you have 3 people on the team:
 
 1. **Add Collaborators:**
+
    - Go to repo → **Settings** → **Collaborators**
    - Click **Add people**
    - Add your 2 teammates by username/email
 
 2. **Branch Protection (Recommended):**
+
    - Go to **Settings** → **Branches**
    - Click **Add branch protection rule**
    - Branch name pattern: `main`
@@ -126,6 +134,7 @@ Since you have 3 people on the team:
    ```
 
 **Your workflow:**
+
 ```bash
 # Create feature branch
 git checkout -b feature/your-feature-name
@@ -172,6 +181,7 @@ venv\Scripts\Activate.ps1
 
 **PowerShell Execution Policy Error?**
 If you get "cannot be loaded because running scripts is disabled":
+
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -179,16 +189,19 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ### When Virtual Environment is Active
 
 You'll see `(venv)` prefix in your terminal:
+
 ```
 (venv) C:\Users\YourName\Projects\image-analysis-system>
 ```
 
-**Important:** 
+**Important:**
+
 - ✅ Install packages ONLY when `(venv)` is active
 - ✅ Run scripts ONLY when `(venv)` is active
 - ❌ Never install packages globally
 
 ### Deactivate (when done working)
+
 ```bash
 deactivate
 ```
@@ -240,6 +253,7 @@ python scripts/setup_models.py
 ```
 
 **What this script does:**
+
 1. Creates `models/` directory
 2. Downloads SmolVLM-500M ONNX model (~500MB)
 3. Downloads MobileCLIP-S2 ONNX model (~100MB)
@@ -247,6 +261,7 @@ python scripts/setup_models.py
 5. Creates model config file
 
 **Expected output:**
+
 ```
 🔧 Model Setup Starting...
 📥 Downloading SmolVLM-500M...
@@ -267,10 +282,12 @@ You downloaded Unsplash Lite - great choice!
 ### Extract and Organize Images
 
 1. **Extract Unsplash Lite:**
+
    - Extract the downloaded zip file
    - You'll get a folder with ~25,000 images
 
 2. **Select 100 Test Images:**
+
    ```bash
    # We'll create a script to copy 100 random images
    python scripts/prepare_test_data.py --source "C:\path\to\unsplash\photos" --count 100
@@ -294,6 +311,7 @@ python scripts/verify_setup.py
 ```
 
 **Expected output:**
+
 ```
 ✅ Python version: 3.11.x
 ✅ Virtual environment: Active
@@ -315,6 +333,7 @@ python src/init_databases.py
 ```
 
 **Creates:**
+
 - `databases/metadata.db` (SQLite)
 - `databases/embeddings.lance/` (LanceDB)
 
@@ -325,6 +344,7 @@ python src/test_single_image.py data/test_images/sample_001.jpg
 ```
 
 **Expected output:**
+
 ```
 🖼️  Loading image: sample_001.jpg
 🤖 Loading SmolVLM-500M model...
@@ -360,20 +380,24 @@ Before moving to Phase 2, verify:
 ## 🆘 Troubleshooting
 
 ### "Python not found" or wrong version
+
 - Restart terminal/IDE after adding to PATH
 - Use `py -3.11` instead of `python`
 - Check `python --version` shows 3.11.x
 
 ### "No module named 'onnxruntime'"
+
 - Verify virtual environment is activated (see `(venv)` prefix)
 - Re-run `pip install -r requirements.txt`
 
 ### Model download fails
+
 - Check internet connection
 - Script will provide manual download links
 - Download manually and place in `models/` directory
 
 ### Git push rejected
+
 - Set up Git identity first:
   ```bash
   git config --global user.name "Your Name"
@@ -381,6 +405,7 @@ Before moving to Phase 2, verify:
   ```
 
 ### PowerShell script execution error
+
 - Run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
 ---
@@ -420,6 +445,7 @@ deactivate
 ## 📞 Next Steps
 
 Once setup is complete:
+
 1. ✅ Verify all checklist items above
 2. 📝 Report any issues encountered
 3. 🚀 Ready for **Phase 1 Implementation** (Core pipeline development)

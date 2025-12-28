@@ -1,19 +1,43 @@
+# =============================================================================
+# Local-First Image Analysis System v0.1
+# Requirements File
+# =============================================================================
+# v0.1 uses OpenAI CLIP ViT-B/32 only
+# MobileCLIP and SmolVLM deferred to v0.2 pending optimum export support
+# =============================================================================
+
 # Core Dependencies
 numpy==1.24.3
 opencv-python==4.8.1.78
 pillow==10.1.0
 
 # ML Runtime
+# onnxruntime: ONNX model inference engine
 onnxruntime==1.16.3
+# openvino: Optional Intel hardware acceleration
 openvino==2023.2.0
 
 # Database
+# lancedb: Vector database for embedding storage and similarity search
 lancedb==0.3.3
 
 # ML Models & Utilities
-transformers==4.36.0
-torch==2.1.0
-# Note: Install PyTorch with: pip install torch==2.1.0 --index-url https://download.pytorch.org/whl/cpu
+# transformers: Required for model loading and tokenization
+# Version 4.57.3 tested and working with CLIP ViT-B/32 export
+transformers==4.57.3
+# tokenizers: Fast tokenization backend for transformers
+# Version 0.22.1 required for compatibility with transformers 4.57.3
+tokenizers==0.22.1
+
+# PyTorch - CPU-only version
+# IMPORTANT: Install separately with CPU-only index to avoid large CUDA downloads
+# Command: pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+# Note: torch 2.5.1+cpu is the stable CPU version compatible with optimum export
+
+# Model conversion tools
+# optimum: HuggingFace's optimization toolkit for ONNX export
+optimum[onnxruntime]
+onnx
 
 # Utilities
 requests==2.31.0

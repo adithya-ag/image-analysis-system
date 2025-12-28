@@ -1,10 +1,19 @@
 """
-Model Setup Script
-Downloads and prepares ONNX models for image analysis.
+Model Setup Script - Local-First Image Analysis System v0.1
+=============================================================
 
-Models:
-1. SmolVLM-500M (primary) - ~500MB
-2. MobileCLIP-S2 (benchmark) - ~100MB
+Downloads and converts OpenAI CLIP ViT-B/32 to ONNX format.
+
+v0.1 Model:
+    - OpenAI CLIP ViT-B/32: Text-image embedding model (512-dim embeddings)
+
+Deferred to v0.2 (pending optimum export support):
+    - SmolVLM-500M: Idefics3 architecture not supported by optimum
+    - MobileCLIP-S2: Requires custom export handling
+
+Prerequisites:
+    pip install optimum[onnxruntime] onnx
+    pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
 
 Usage:
     python scripts/setup_models.py
@@ -12,10 +21,10 @@ Usage:
 
 import os
 import sys
-import requests
-from pathlib import Path
-from tqdm import tqdm
+import subprocess
 import json
+import shutil
+from pathlib import Path
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -23,152 +32,238 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 
 class ModelSetup:
+    """Handles downloading and converting CLIP ViT-B/32 to ONNX format."""
+
     def __init__(self):
         self.models_dir = PROJECT_ROOT / "models"
         self.models_dir.mkdir(exist_ok=True)
-        
-        # Model configurations
-        # Note: These are placeholder URLs - actual ONNX models need to be sourced
+
+        # v0.1: CLIP ViT-B/32 only
+        # SmolVLM and MobileCLIP deferred to v0.2
         self.models = {
-            "smolvlm_500m": {
-                "name": "SmolVLM-500M",
-                "url": "https://huggingface.co/HuggingFaceTB/SmolVLM-500M-Instruct/resolve/main/model.onnx",
-                "filename": "smolvlm_500m.onnx",
-                "size_mb": 500,
+            "clip_vit_b32": {
+                "name": "CLIP ViT-B/32",
+                "hf_model_id": "openai/clip-vit-base-patch32",
+                "task": "feature-extraction",
+                "output_dir": "clip_vit_b32",
                 "embedding_dim": 512,
-            },
-            "mobileclip_s2": {
-                "name": "MobileCLIP-S2",
-                "url": "https://huggingface.co/apple/MobileCLIP-S2/resolve/main/model.onnx",
-                "filename": "mobileclip_s2.onnx",
-                "size_mb": 100,
-                "embedding_dim": 512,
+                "description": "OpenAI CLIP model for text-image embeddings",
             }
         }
-    
-    def download_file(self, url, filepath):
-        """Download file with progress bar"""
+
+    def check_prerequisites(self) -> bool:
+        """Check if required packages are installed."""
+        print("\n[1/4] Checking prerequisites...")
+
+        missing = []
+
+        # Check optimum
         try:
-            response = requests.get(url, stream=True, timeout=30)
-            response.raise_for_status()
-            
-            total_size = int(response.headers.get('content-length', 0))
-            
-            with open(filepath, 'wb') as f, tqdm(
-                desc=filepath.name,
-                total=total_size,
-                unit='B',
-                unit_scale=True,
-                unit_divisor=1024,
-            ) as pbar:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                    pbar.update(len(chunk))
-            
-            return True
-        except Exception as e:
-            print(f"❌ Download failed: {e}")
+            import optimum
+            version = getattr(optimum, '__version__', 'installed')
+            print(f"      optimum: OK (v{version})")
+        except ImportError:
+            print("      optimum: MISSING")
+            missing.append("optimum[onnxruntime]")
+
+        # Check onnx
+        try:
+            import onnx
+            print(f"      onnx: OK (v{onnx.__version__})")
+        except ImportError:
+            print("      onnx: MISSING")
+            missing.append("onnx")
+
+        # Check torch
+        try:
+            import torch
+            print(f"      torch: OK (v{torch.__version__})")
+        except ImportError:
+            print("      torch: MISSING")
+            missing.append("torch")
+
+        # Check transformers
+        try:
+            import transformers
+            print(f"      transformers: OK (v{transformers.__version__})")
+        except ImportError:
+            print("      transformers: MISSING")
+            missing.append("transformers")
+
+        if missing:
+            print(f"\n      Missing packages: {', '.join(missing)}")
+            print("      Install with:")
+            print("        pip install optimum[onnxruntime] onnx transformers")
+            print("        pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu")
             return False
-    
-    def check_existing_model(self, model_key):
-        """Check if model already exists"""
-        filepath = self.models_dir / self.models[model_key]["filename"]
-        if filepath.exists():
-            size_mb = filepath.stat().st_size / (1024 * 1024)
-            print(f"✅ {self.models[model_key]['name']} already exists ({size_mb:.1f} MB)")
-            return True
-        return False
-    
-    def setup_model(self, model_key):
-        """Download and setup a single model"""
-        model = self.models[model_key]
-        filepath = self.models_dir / model["filename"]
-        
-        print(f"\n📥 Downloading {model['name']}...")
-        print(f"   URL: {model['url']}")
-        print(f"   Size: ~{model['size_mb']} MB")
-        
-        # Note: These URLs are placeholders
-        # In reality, we need to:
-        # 1. Download from HuggingFace
-        # 2. Convert to ONNX if not already
-        # 3. Optimize for OpenVINO
-        
-        print(f"\n⚠️  MANUAL DOWNLOAD REQUIRED:")
-        print(f"   The models need to be manually downloaded and converted to ONNX.")
-        print(f"\n   STEPS:")
-        print(f"   1. Download {model['name']} from HuggingFace")
-        print(f"   2. Convert to ONNX format (if needed)")
-        print(f"   3. Save as: {filepath}")
-        print(f"\n   For now, creating placeholder file...")
-        
-        # Create placeholder file for development
-        with open(filepath, 'w') as f:
-            f.write(f"# Placeholder for {model['name']} ONNX model\n")
-            f.write(f"# Download from: {model['url']}\n")
-            f.write(f"# Expected size: {model['size_mb']} MB\n")
-        
-        print(f"✅ Placeholder created: {filepath}")
+
         return True
-    
-    def create_config(self):
-        """Create model configuration file"""
+
+    def check_existing_model(self, model_key: str) -> bool:
+        """Check if model already exists and is valid."""
+        model = self.models[model_key]
+        model_dir = self.models_dir / model["output_dir"]
+        model_file = model_dir / "model.onnx"
+
+        if model_file.exists():
+            size_mb = model_file.stat().st_size / (1024 * 1024)
+            if size_mb > 10:  # Sanity check: model should be > 10MB
+                print(f"      {model['name']} already exists ({size_mb:.1f} MB)")
+                return True
+            else:
+                print(f"      {model['name']} exists but seems corrupt ({size_mb:.1f} MB), re-downloading...")
+                shutil.rmtree(model_dir, ignore_errors=True)
+                return False
+        return False
+
+    def convert_model(self, model_key: str) -> bool:
+        """Download and convert a model to ONNX using optimum."""
+        model = self.models[model_key]
+        output_path = self.models_dir / model["output_dir"]
+
+        print(f"\n[3/4] Downloading and converting {model['name']}...")
+        print(f"      HuggingFace Model: {model['hf_model_id']}")
+        print(f"      Output Directory: {output_path}")
+        print(f"      Task: {model['task']}")
+        print(f"      This may take 2-5 minutes on first run...\n")
+
+        # Build the optimum export command
+        cmd = [
+            sys.executable, "-m", "optimum.exporters.onnx",
+            "--model", model["hf_model_id"],
+            "--task", model["task"],
+            str(output_path)
+        ]
+
+        try:
+            # Run the conversion with real-time output
+            result = subprocess.run(
+                cmd,
+                cwd=str(self.models_dir),
+                capture_output=False,
+                text=True
+            )
+
+            if result.returncode == 0:
+                # Verify the model was created
+                model_file = output_path / "model.onnx"
+                if model_file.exists():
+                    size_mb = model_file.stat().st_size / (1024 * 1024)
+                    print(f"\n      {model['name']} converted successfully! ({size_mb:.1f} MB)")
+                    return True
+                else:
+                    print(f"\n      ERROR: Conversion completed but model.onnx not found")
+                    return False
+            else:
+                print(f"\n      ERROR: Conversion failed with return code {result.returncode}")
+                self._print_manual_instructions(model_key)
+                return False
+
+        except FileNotFoundError:
+            print(f"\n      ERROR: Python executable not found")
+            self._print_manual_instructions(model_key)
+            return False
+        except Exception as e:
+            print(f"\n      ERROR: {type(e).__name__}: {e}")
+            self._print_manual_instructions(model_key)
+            return False
+
+    def _print_manual_instructions(self, model_key: str) -> None:
+        """Print manual conversion instructions if automatic fails."""
+        model = self.models[model_key]
+
+        print("\n      MANUAL CONVERSION INSTRUCTIONS:")
+        print("      --------------------------------")
+        print(f"      cd {self.models_dir}")
+        print(f"      optimum-cli export onnx \\")
+        print(f"          --model {model['hf_model_id']} \\")
+        print(f"          --task {model['task']} \\")
+        print(f"          {model['output_dir']}/")
+
+    def create_config(self) -> None:
+        """Create model configuration file."""
+        print("\n[4/4] Creating model configuration...")
+
         config = {
-            "models": self.models,
-            "default_model": "smolvlm_500m",
+            "_comment": "Local-First Image Analysis System v0.1 - Model Configuration",
+            "_note": "v0.1 uses CLIP ViT-B/32 only. MobileCLIP and SmolVLM deferred to v0.2.",
+            "version": "0.1.0",
+            "default_model": "clip_vit_b32",
             "model_dir": str(self.models_dir),
+            "models": {}
         }
-        
+
+        # Add model info
+        for key, model in self.models.items():
+            model_path = self.models_dir / model["output_dir"] / "model.onnx"
+            exists = model_path.exists()
+            size_mb = model_path.stat().st_size / (1024 * 1024) if exists else 0
+
+            config["models"][key] = {
+                "name": model["name"],
+                "hf_model_id": model["hf_model_id"],
+                "path": str(model_path),
+                "embedding_dim": model["embedding_dim"],
+                "description": model["description"],
+                "exists": exists,
+                "size_mb": round(size_mb, 1) if exists else None
+            }
+
         config_path = self.models_dir / "model_config.json"
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
-        
-        print(f"✅ Model config created: {config_path}")
-    
-    def run(self):
-        """Run complete setup process"""
-        print("=" * 60)
-        print("🔧 MODEL SETUP - Local-First Image Analysis System")
-        print("=" * 60)
-        
-        # Check and download each model
-        for model_key in self.models.keys():
-            if not self.check_existing_model(model_key):
-                self.setup_model(model_key)
-        
-        # Create configuration
+
+        print(f"      Configuration saved to: {config_path}")
+
+    def run(self) -> bool:
+        """Run complete setup process."""
+        print("=" * 65)
+        print("  MODEL SETUP - Local-First Image Analysis System v0.1")
+        print("  Model: OpenAI CLIP ViT-B/32 (512-dim embeddings)")
+        print("=" * 65)
+
+        # Step 1: Check prerequisites
+        if not self.check_prerequisites():
+            print("\n" + "=" * 65)
+            print("  SETUP FAILED: Missing prerequisites")
+            print("=" * 65)
+            return False
+
+        # Step 2: Check existing models
+        print("\n[2/4] Checking for existing models...")
+        model_key = "clip_vit_b32"
+        model_exists = self.check_existing_model(model_key)
+
+        # Step 3: Convert if needed
+        if not model_exists:
+            if not self.convert_model(model_key):
+                print("\n" + "=" * 65)
+                print("  SETUP FAILED: Model conversion failed")
+                print("  See manual instructions above.")
+                print("=" * 65)
+                return False
+
+        # Step 4: Create configuration
         self.create_config()
-        
-        print("\n" + "=" * 60)
-        print("📋 NEXT STEPS FOR ACTUAL MODEL SETUP:")
-        print("=" * 60)
-        print("\nTo get real ONNX models:")
-        print("\n1. SmolVLM-500M:")
-        print("   - Visit: https://huggingface.co/HuggingFaceTB/SmolVLM-500M-Instruct")
-        print("   - Download model files")
-        print("   - Convert to ONNX using: optimum-cli export onnx")
-        print("   - Place in: models/smolvlm_500m.onnx")
-        
-        print("\n2. MobileCLIP-S2:")
-        print("   - Visit: https://huggingface.co/apple/MobileCLIP-S2")
-        print("   - Download model files")
-        print("   - Convert to ONNX")
-        print("   - Place in: models/mobileclip_s2.onnx")
-        
-        print("\n3. Alternative (for quick testing):")
-        print("   - Use pre-trained CLIP model from OpenAI")
-        print("   - Install: pip install clip-onnx")
-        print("   - Convert: python -m clip_onnx.convert")
-        
-        print("\n" + "=" * 60)
-        print("✅ Model setup complete (placeholders created)")
-        print("   Replace placeholders with actual ONNX models to proceed.")
-        print("=" * 60)
+
+        # Summary
+        print("\n" + "=" * 65)
+        print("  SETUP COMPLETE")
+        print("=" * 65)
+        print("\n  Model ready: CLIP ViT-B/32")
+        print("\n  Next steps:")
+        print("    1. Run: python scripts/verify_setup.py")
+        print("    2. Run: python src/init_databases.py")
+        print("=" * 65)
+
+        return True
 
 
 def main():
+    """Entry point."""
     setup = ModelSetup()
-    setup.run()
+    success = setup.run()
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

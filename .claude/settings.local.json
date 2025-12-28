@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/verify_setup.py:*)",
+      "Bash(\"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\venv\\\\Scripts\\\\python.exe\":*)",
+      "Bash(test:*)",
+      "Bash(rm:*)",
+      "Bash(cat:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

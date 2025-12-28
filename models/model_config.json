@@ -1,0 +1,18 @@
+{
+  "_comment": "Local-First Image Analysis System v0.1 - Model Configuration",
+  "_note": "v0.1 uses CLIP ViT-B/32 only. MobileCLIP and SmolVLM deferred to v0.2.",
+  "version": "0.1.0",
+  "default_model": "clip_vit_b32",
+  "model_dir": "C:\\Adithya Work\\image-analysis-system\\image-analysis-system\\models",
+  "models": {
+    "clip_vit_b32": {
+      "name": "CLIP ViT-B/32",
+      "hf_model_id": "openai/clip-vit-base-patch32",
+      "path": "C:\\Adithya Work\\image-analysis-system\\image-analysis-system\\models\\clip_vit_b32\\model.onnx",
+      "embedding_dim": 512,
+      "description": "OpenAI CLIP model for text-image embeddings",
+      "exists": true,
+      "size_mb": 577.5
+    }
+  }
+}

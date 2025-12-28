@@ -25,7 +25,7 @@ class DatabaseInitializer:
     
     def init_sqlite(self):
         """Initialize SQLite database with schema"""
-        print("📊 Initializing SQLite database...")
+        print("[*] Initializing SQLite database...")
         
         conn = sqlite3.connect(self.sqlite_path)
         cursor = conn.cursor()
@@ -104,20 +104,20 @@ class DatabaseInitializer:
         conn.commit()
         conn.close()
         
-        print(f"✅ SQLite database created: {self.sqlite_path}")
-        print(f"   Tables: images, search_history, model_benchmarks")
+        print(f"[OK] SQLite database created: {self.sqlite_path}")
+        print(f"     Tables: images, search_history, model_benchmarks")
     
     def init_lancedb(self):
         """Initialize LanceDB for vector storage"""
-        print("\n📊 Initializing LanceDB...")
-        
+        print("\n[*] Initializing LanceDB...")
+
         try:
             import lancedb
             import pyarrow as pa
-            
+
             # Create LanceDB connection
             db = lancedb.connect(str(self.lance_path))
-            
+
             # Define schema for embeddings table
             schema = pa.schema([
                 pa.field("image_id", pa.string()),
@@ -125,22 +125,22 @@ class DatabaseInitializer:
                 pa.field("model_name", pa.string()),
                 pa.field("timestamp", pa.timestamp('ms')),
             ])
-            
+
             # Create table if it doesn't exist
             # Note: LanceDB creates table on first insert, so this is a placeholder
-            print(f"✅ LanceDB initialized: {self.lance_path}")
-            print(f"   Schema: image_id, embedding[512], model_name, timestamp")
-            
+            print(f"[OK] LanceDB initialized: {self.lance_path}")
+            print(f"     Schema: image_id, embedding[512], model_name, timestamp")
+
         except ImportError:
-            print("⚠️  LanceDB not installed. Install with: pip install lancedb pyarrow")
-            print("   Creating directory placeholder...")
+            print("[WARN] LanceDB not installed. Install with: pip install lancedb pyarrow")
+            print("       Creating directory placeholder...")
             self.lance_path.mkdir(exist_ok=True)
-            print(f"✅ LanceDB directory created: {self.lance_path}")
+            print(f"[OK] LanceDB directory created: {self.lance_path}")
     
     def verify_databases(self):
         """Verify databases are created and accessible"""
-        print("\n🔍 Verifying databases...")
-        
+        print("\n[*] Verifying databases...")
+
         # Check SQLite
         if self.sqlite_path.exists():
             conn = sqlite3.connect(self.sqlite_path)
@@ -148,43 +148,43 @@ class DatabaseInitializer:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = cursor.fetchall()
             conn.close()
-            
-            print(f"✅ SQLite verified: {len(tables)} tables")
+
+            print(f"[OK] SQLite verified: {len(tables)} tables")
             for table in tables:
-                print(f"   - {table[0]}")
+                print(f"     - {table[0]}")
         else:
-            print("❌ SQLite database not found")
-        
+            print("[FAIL] SQLite database not found")
+
         # Check LanceDB
         if self.lance_path.exists():
-            print(f"✅ LanceDB directory verified")
+            print(f"[OK] LanceDB directory verified")
         else:
-            print("❌ LanceDB directory not found")
+            print("[FAIL] LanceDB directory not found")
     
     def run(self):
         """Run complete initialization"""
         print("=" * 60)
-        print("🔧 DATABASE INITIALIZATION")
+        print("DATABASE INITIALIZATION")
         print("=" * 60)
         print()
-        
+
         try:
             self.init_sqlite()
             self.init_lancedb()
             self.verify_databases()
-            
+
             print("\n" + "=" * 60)
-            print("✅ DATABASE INITIALIZATION COMPLETE")
+            print("[OK] DATABASE INITIALIZATION COMPLETE")
             print("=" * 60)
-            print(f"📁 Database directory: {self.db_dir}")
-            print(f"📊 SQLite: {self.sqlite_path}")
-            print(f"📊 LanceDB: {self.lance_path}")
+            print(f"Database directory: {self.db_dir}")
+            print(f"SQLite: {self.sqlite_path}")
+            print(f"LanceDB: {self.lance_path}")
             print("=" * 60)
-            
+
             return 0
-            
+
         except Exception as e:
-            print(f"\n❌ Error during initialization: {e}")
+            print(f"\n[FAIL] Error during initialization: {e}")
             import traceback
             traceback.print_exc()
             return 1

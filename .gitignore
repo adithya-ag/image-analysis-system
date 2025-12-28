@@ -74,3 +74,7 @@ htmlcov/
 
 # OS
 Thumbs.db
+
+# Ignore all model subdirectories
+models/**/
+!models/model_config.json
