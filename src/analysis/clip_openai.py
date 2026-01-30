@@ -21,23 +21,29 @@ class CLIPOpenAI(EmbeddingModel):
     Supports both image and text embeddings.
     """
     
-    def __init__(self, model_path: Union[str, Path], model_name: str = "clip_vit_b32"):
+    def __init__(self, config):
         """
         Initialize CLIP model.
-        
+
         Args:
-            model_path: Path to CLIP ONNX model file
-            model_name: Model identifier (default: clip_vit_b32)
+            config: Configuration object with model paths
         """
-        super().__init__(model_path, model_name)
-        
+        self.config = config
+        self.model_path = Path(config.model_path)
+        self.model_name = config.model_name
+        self.session = None
+
+        # Verify model file exists
+        if not self.model_path.exists():
+            raise FileNotFoundError(f"Model file not found: {self.model_path}")
+
         # CLIP-specific settings
         self.embedding_dim = 512
         self.image_size = 224
-        
+
         # Load processor (for preprocessing)
         self.processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        
+
         # Load model
         self.load_model()
     
@@ -182,19 +188,34 @@ class CLIPOpenAI(EmbeddingModel):
         # Normalize each embedding
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         embeddings = embeddings / norms
-        
+
         return embeddings
+
+    def get_model_info(self) -> dict:
+        """Get model information
+
+        Returns:
+            Dictionary with model metadata
+        """
+        return {
+            'name': self.model_name,
+            'type': 'CLIP ViT-B/32',
+            'model_size_mb': self.model_path.stat().st_size / (1024**2),
+            'embedding_dim': self.embedding_dim,
+            'image_size': self.image_size,
+            'provider': self.active_provider,
+        }
 
 
 # Factory function for easy instantiation
-def create_clip_model(model_path: Union[str, Path]) -> CLIPOpenAI:
+def create_clip_model(config) -> CLIPOpenAI:
     """
     Factory function to create CLIP model instance.
-    
+
     Args:
-        model_path: Path to CLIP ONNX model
-        
+        config: Configuration object with model paths
+
     Returns:
         Initialized CLIPOpenAI instance
     """
-    return CLIPOpenAI(model_path)
+    return CLIPOpenAI(config)

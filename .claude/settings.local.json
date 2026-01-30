@@ -6,7 +6,25 @@
       "Bash(test:*)",
       "Bash(rm:*)",
       "Bash(cat:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add Phase 1 implementation with CLIP model and storage layer\n\n- Add CLIP embedding extraction \\(base.py, clip_openai.py\\)\n- Add SQLite and LanceDB storage implementations\n- Add config module and test script\n- Update gitignore to exclude large model files\n- Remove accidentally nested repository\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(where:*)",
+      "Bash(dir \"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\data\\\\test_images\\\\test_0001.jpg\")",
+      "Bash(dir \"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\models\\\\clip_vit_b32\\\\*.onnx\" /b)",
+      "Bash(powershell -Command \"Get-ChildItem ''c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\models\\\\clip_vit_b32\\\\*.onnx'' | Select-Object Name\")",
+      "Bash(venvScriptspython scriptsfix_clip_export.py)",
+      "Bash(\"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\venv\\\\Scripts\\\\pip.exe\" install onnxscript)",
+      "Bash(powershell -Command:*)",
+      "Bash(dir \"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\models\\\\clip_vit_b32\")",
+      "Bash(del model.onnx.data)",
+      "Bash(ren vision_model.onnx model.onnx)",
+      "Bash(sqlite3:*)",
+      "Bash(\"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\venv\\\\Scripts\\\\python.exe\" -c:*)",
+      "Bash(\"c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\venv\\\\Scripts\\\\python.exe\" -c \"import lancedb; db = lancedb.connect\\(''c:\\\\Adithya Work\\\\image-analysis-system\\\\image-analysis-system\\\\databases\\\\embeddings.lance''\\); tbl = db.open_table\\(''embeddings''\\); result = tbl.search\\(\\).limit\\(1\\).to_list\\(\\)[0]; print\\(''Columns:'', list\\(result.keys\\(\\)\\)\\); print\\(''Image ID:'', result[''image_id'']\\); print\\(''First 10 embedding values:'', result[''vector''][:10]\\)\")",
+      "Bash(python:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

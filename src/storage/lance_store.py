@@ -1,206 +1,238 @@
 """
-LanceDB Storage Layer
-Manages vector embeddings in LanceDB for similarity search.
+LanceDB Storage - Enhanced for Batch Processing
+
+Handles vector embeddings storage with support for batch operations.
+
+Phase 1 Day 2 - Image Analysis System v0.1
 """
 
-from pathlib import Path
-from typing import Union, List, Tuple
-import numpy as np
 import lancedb
-from datetime import datetime
+import numpy as np
+from pathlib import Path
+from typing import Optional, Dict, List
 
 
-class LanceDBStore:
-    """
-    LanceDB interface for vector embeddings.
+class LanceStore:
+    """LanceDB for vector embeddings storage"""
     
-    Stores:
-    - Image embeddings (512-dim vectors)
-    - Model metadata
-    - Timestamp information
-    """
-    
-    def __init__(self, db_path: Union[str, Path], table_name: str = "embeddings"):
-        """
-        Initialize LanceDB connection.
+    def __init__(self, db_path: str, table_name: str = "image_embeddings"):
+        """Initialize LanceDB connection
         
         Args:
-            db_path: Path to LanceDB database directory
-            table_name: Name of embeddings table (default: embeddings)
+            db_path: Path to LanceDB directory
+            table_name: Name of the embeddings table
         """
         self.db_path = Path(db_path)
         self.table_name = table_name
-        self.db = None
-        self.table = None
         
-        self.connect()
-    
-    def connect(self) -> None:
-        """Open connection to LanceDB"""
+        # Create directory if it doesn't exist
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Connect to database
         self.db = lancedb.connect(str(self.db_path))
         
-        # Check if table exists
-        if self.table_name in self.db.table_names():
-            self.table = self.db.open_table(self.table_name)
-        else:
-            self.table = None  # Will be created on first insert
+        # Try to open existing table
+        try:
+            self.table = self.db.open_table(table_name)
+        except Exception:
+            # Table doesn't exist yet - it will be created on first store
+            self.table = None
     
-    def insert_embedding(
-        self,
-        image_id: str,
-        embedding: np.ndarray,
-        model_name: str
-    ) -> None:
-        """
-        Insert or update embedding for an image.
+    def store_embedding(self, image_id: str, embedding: np.ndarray, metadata: Optional[Dict] = None):
+        """Store image embedding
         
         Args:
-            image_id: Unique image identifier
-            embedding: Embedding vector (512-dim)
-            model_name: Name of model that generated embedding
+            image_id: Unique identifier for the image
+            embedding: Embedding vector (numpy array)
+            metadata: Optional metadata dictionary
         """
+        # Ensure embedding is 1D numpy array
+        if len(embedding.shape) > 1:
+            embedding = embedding.flatten()
+        
         # Prepare data
-        data = [{
-            "image_id": image_id,
-            "vector": embedding.tolist(),  # LanceDB expects list
-            "model_name": model_name,
-            "timestamp": datetime.now().isoformat()
-        }]
+        data = {
+            'image_id': image_id,
+            'vector': embedding.tolist(),
+        }
         
-        # Create table if doesn't exist
+        # Add metadata if provided
+        if metadata:
+            for key, value in metadata.items():
+                if key not in ['image_id', 'vector']:
+                    data[key] = value
+        
+        # Create or append to table
         if self.table is None:
-            self.table = self.db.create_table(self.table_name, data=data)
+            # Create new table
+            self.table = self.db.create_table(
+                self.table_name,
+                data=[data]
+            )
         else:
-            # Add to existing table
-            self.table.add(data)
+            # Append to existing table
+            # Note: LanceDB's add() doesn't support upsert, so we need to check for duplicates
+            # For now, we'll just append (in production, we'd handle duplicates properly)
+            self.table.add([data])
     
-    def insert_batch_embeddings(
-        self,
-        image_ids: List[str],
-        embeddings: np.ndarray,
-        model_name: str
-    ) -> None:
-        """
-        Insert multiple embeddings at once.
+    def get_embedding(self, image_id: str) -> Optional[np.ndarray]:
+        """Retrieve embedding for an image
         
         Args:
-            image_ids: List of image identifiers
-            embeddings: Array of embeddings (shape: [n, 512])
-            model_name: Name of model that generated embeddings
-        """
-        # Prepare batch data
-        timestamp = datetime.now().isoformat()
-        data = [
-            {
-                "image_id": image_id,
-                "vector": embedding.tolist(),
-                "model_name": model_name,
-                "timestamp": timestamp
-            }
-            for image_id, embedding in zip(image_ids, embeddings)
-        ]
-        
-        # Create or add to table
-        if self.table is None:
-            self.table = self.db.create_table(self.table_name, data=data)
-        else:
-            self.table.add(data)
-    
-    def search(
-        self,
-        query_embedding: np.ndarray,
-        limit: int = 10
-    ) -> List[Tuple[str, float]]:
-        """
-        Search for similar images using vector similarity.
-        
-        Args:
-            query_embedding: Query embedding vector (512-dim)
-            limit: Maximum number of results to return
+            image_id: Unique identifier for the image
             
         Returns:
-            List of (image_id, similarity_score) tuples, sorted by similarity
-        """
-        if self.table is None:
-            return []
-        
-        # Perform vector search
-        results = self.table.search(query_embedding.tolist()).limit(limit).to_list()
-        
-        # Extract image_id and distance (convert to similarity)
-        # LanceDB returns L2 distance - convert to similarity score
-        matches = []
-        for result in results:
-            image_id = result["image_id"]
-            distance = result["_distance"]
-            
-            # Convert L2 distance to similarity score (0-1 range)
-            # Lower distance = higher similarity
-            similarity = 1.0 / (1.0 + distance)
-            
-            matches.append((image_id, similarity))
-        
-        return matches
-    
-    def get_embedding(self, image_id: str) -> np.ndarray:
-        """
-        Retrieve embedding for a specific image.
-        
-        Args:
-            image_id: Image identifier
-            
-        Returns:
-            Embedding vector, or None if not found
+            Embedding vector as numpy array, or None if not found
         """
         if self.table is None:
             return None
         
-        # Query by image_id
-        results = self.table.search().where(f"image_id = '{image_id}'").limit(1).to_list()
+        # Search for the image
+        results = self.table.search() \
+            .where(f"image_id = '{image_id}'") \
+            .limit(1) \
+            .to_list()
         
         if results:
-            return np.array(results[0]["vector"])
+            return np.array(results[0]['vector'])
         return None
     
-    def delete_embedding(self, image_id: str) -> None:
-        """
-        Delete embedding for an image.
+    def search_similar(
+        self, 
+        query_embedding: np.ndarray, 
+        top_k: int = 10,
+        filter_image_id: Optional[str] = None
+    ) -> List[Dict]:
+        """Search for similar images
         
         Args:
-            image_id: Image identifier
+            query_embedding: Query embedding vector
+            top_k: Number of results to return
+            filter_image_id: If provided, only return this specific image
+            
+        Returns:
+            List of dictionaries with image_id and similarity score
         """
         if self.table is None:
-            return
+            return []
         
-        # LanceDB delete operation
-        self.table.delete(f"image_id = '{image_id}'")
+        # Ensure embedding is 1D
+        if query_embedding is not None and len(query_embedding.shape) > 1:
+            query_embedding = query_embedding.flatten()
+        
+        # If filtering by specific ID
+        if filter_image_id:
+            results = self.table.search() \
+                .where(f"image_id = '{filter_image_id}'") \
+                .limit(1) \
+                .to_list()
+        elif query_embedding is not None:
+            # Vector similarity search
+            results = self.table.search(query_embedding.tolist()) \
+                .limit(top_k) \
+                .to_list()
+        else:
+            return []
+        
+        # Format results
+        formatted_results = []
+        for result in results:
+            formatted_results.append({
+                'image_id': result['image_id'],
+                'score': result.get('_distance', 0.0),
+                'metadata': {k: v for k, v in result.items() 
+                           if k not in ['image_id', 'vector', '_distance']}
+            })
+        
+        return formatted_results
     
-    def get_stats(self) -> dict:
-        """
-        Get database statistics.
+    def count_embeddings(self) -> int:
+        """Count total number of embeddings in database
         
         Returns:
-            Statistics dictionary
+            Number of embeddings
         """
         if self.table is None:
-            return {"total_embeddings": 0}
+            return 0
         
-        count = self.table.count_rows()
+        # LanceDB doesn't have a direct count method, so we count rows
+        try:
+            # Get all rows and count them
+            # Note: This is not efficient for large datasets, but fine for v0.1
+            count = self.table.count_rows()
+            return count
+        except Exception:
+            # Fallback: get all and count
+            results = self.table.search().limit(100000).to_list()
+            return len(results)
+    
+    def delete_embedding(self, image_id: str) -> bool:
+        """Delete embedding for an image
+        
+        Args:
+            image_id: Unique identifier for the image
+            
+        Returns:
+            True if embedding was deleted, False if not found
+        """
+        if self.table is None:
+            return False
+        
+        try:
+            # LanceDB delete operation
+            self.table.delete(f"image_id = '{image_id}'")
+            return True
+        except Exception:
+            return False
+    
+    def get_all_ids(self) -> List[str]:
+        """Get all image IDs in the database
+        
+        Returns:
+            List of image IDs
+        """
+        if self.table is None:
+            return []
+        
+        # Get all records (just IDs)
+        results = self.table.search() \
+            .select(['image_id']) \
+            .limit(100000) \
+            .to_list()
+        
+        return [r['image_id'] for r in results]
+    
+    def get_stats(self) -> Dict:
+        """Get database statistics
+        
+        Returns:
+            Dictionary with statistics
+        """
+        if self.table is None:
+            return {
+                'total_embeddings': 0,
+                'embedding_dimension': None,
+            }
+        
+        count = self.count_embeddings()
+        
+        # Get embedding dimension (sample one embedding)
+        dimension = None
+        if count > 0:
+            sample = self.table.search().limit(1).to_list()
+            if sample:
+                dimension = len(sample[0]['vector'])
         
         return {
-            "total_embeddings": count,
-            "table_name": self.table_name
+            'total_embeddings': count,
+            'embedding_dimension': dimension,
         }
     
-    def close(self) -> None:
+    def close(self):
         """Close database connection"""
-        # LanceDB doesn't require explicit close
+        # LanceDB handles connection cleanup automatically
         pass
     
-    def __enter__(self):
-        """Context manager entry"""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
+    def __del__(self):
+        """Destructor"""
         self.close()

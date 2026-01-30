@@ -1,204 +1,119 @@
 """
-SQLite Storage Layer
-Manages structured metadata in SQLite database.
+SQLite Storage - Enhanced for Batch Processing
+
+Handles metadata storage with support for batch operations.
+
+Phase 1 Day 2 - Image Analysis System v0.1
 """
 
 import sqlite3
-from pathlib import Path
-from typing import Optional, Dict, Any, List
 from datetime import datetime
-import json
+from pathlib import Path
+from typing import Optional, Dict, List, Any
 
 
 class SQLiteStore:
-    """
-    SQLite database interface for image metadata.
+    """SQLite database for image metadata storage"""
     
-    Stores:
-    - Image paths, file info
-    - Model metadata
-    - Placeholder columns for future features (v0.2)
-    """
-    
-    def __init__(self, db_path: Union[str, Path]):
-        """
-        Initialize SQLite connection.
+    def __init__(self, db_path: str):
+        """Initialize SQLite connection
         
         Args:
             db_path: Path to SQLite database file
         """
         self.db_path = Path(db_path)
-        self.connection = None
-        self.connect()
-    
-    def connect(self) -> None:
-        """Open connection to SQLite database"""
-        self.connection = sqlite3.connect(str(self.db_path))
-        self.connection.row_factory = sqlite3.Row  # Return rows as dictionaries
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Ensure tables exist
-        self._ensure_tables()
-    
-    def _ensure_tables(self) -> None:
-        """
-        Create tables if they don't exist.
-        Schema includes placeholder columns for v0.2 features.
-        """
-        cursor = self.connection.cursor()
+        # Connect to database
+        self.conn = sqlite3.connect(str(self.db_path))
+        self.conn.row_factory = sqlite3.Row  # Access columns by name
         
-        # Images table
+        # Ensure table exists (should already exist from init_databases.py)
+        self._verify_schema()
+    
+    def _verify_schema(self):
+        """Verify that the images table exists with correct schema"""
+        cursor = self.conn.cursor()
+        
+        # Check if table exists
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS images (
-                image_id TEXT PRIMARY KEY,
-                file_path TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                file_size_bytes INTEGER,
-                width INTEGER,
-                height INTEGER,
-                format TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
-                -- Placeholder columns for v0.2 features
-                tags TEXT,              -- JSON array
-                ocr_text TEXT,
-                face_count INTEGER DEFAULT 0,
-                face_data TEXT,         -- JSON array
-                mood TEXT,
-                scene_type TEXT,
-                
-                -- Model metadata
-                embedding_model TEXT,
-                embedding_version TEXT,
-                
-                -- Search optimization
-                last_accessed TIMESTAMP,
-                access_count INTEGER DEFAULT 0
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='images'
+        """)
+        
+        if not cursor.fetchone():
+            raise RuntimeError(
+                "Images table not found! "
+                "Run 'python src/init_databases.py' first to create schema."
             )
-        """)
-        
-        # Indexes
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_filename ON images(filename)
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_embedding_model ON images(embedding_model)
-        """)
-        
-        self.connection.commit()
     
-    def insert_image(
-        self,
-        image_id: str,
-        file_path: str,
-        filename: str,
-        file_size: int,
-        width: int,
-        height: int,
-        format: str,
-        embedding_model: str,
-        **kwargs
-    ) -> None:
-        """
-        Insert new image record.
+    def store_image(self, image_id: str, file_path: str, metadata: Dict[str, Any]):
+        """Store image metadata
         
         Args:
-            image_id: Unique image identifier
-            file_path: Full path to image file
-            filename: Image filename
-            file_size: File size in bytes
-            width: Image width in pixels
-            height: Image height in pixels
-            format: Image format (JPEG, PNG, etc.)
-            embedding_model: Model used for embedding
-            **kwargs: Additional fields (tags, ocr_text, etc.)
+            image_id: Unique identifier for the image
+            file_path: Full path to the image file
+            metadata: Dictionary with image metadata
         """
-        cursor = self.connection.cursor()
+        cursor = self.conn.cursor()
         
+        # Prepare data
         now = datetime.now()
         
         cursor.execute("""
-            INSERT INTO images (
+            INSERT OR REPLACE INTO images (
                 image_id, file_path, filename, file_size_bytes,
-                width, height, format, embedding_model,
-                created_at, indexed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                width, height, format, created_at, indexed_at,
+                embedding_model, embedding_version,
+                access_count
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            image_id, file_path, filename, file_size,
-            width, height, format, embedding_model,
-            now, now
+            image_id,
+            file_path,
+            metadata.get('filename'),
+            metadata.get('file_size_bytes'),
+            metadata.get('width'),
+            metadata.get('height'),
+            metadata.get('format'),
+            metadata.get('created_at'),
+            now,
+            metadata.get('embedding_model'),
+            metadata.get('embedding_version'),
+            0  # Initial access count
         ))
         
-        self.connection.commit()
+        self.conn.commit()
     
-    def get_image(self, image_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve image record by ID.
+    def get_image(self, image_id: str) -> Optional[Dict]:
+        """Retrieve image metadata by ID
         
         Args:
-            image_id: Image identifier
+            image_id: Unique identifier for the image
             
         Returns:
-            Image metadata as dictionary, or None if not found
+            Dictionary with image metadata, or None if not found
         """
-        cursor = self.connection.cursor()
+        cursor = self.conn.cursor()
         
         cursor.execute("""
             SELECT * FROM images WHERE image_id = ?
         """, (image_id,))
         
         row = cursor.fetchone()
-        
         if row:
             return dict(row)
         return None
     
-    def get_all_images(self) -> List[Dict[str, Any]]:
-        """
-        Get all image records.
-        
-        Returns:
-            List of image metadata dictionaries
-        """
-        cursor = self.connection.cursor()
-        
-        cursor.execute("""
-            SELECT * FROM images ORDER BY indexed_at DESC
-        """)
-        
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-    
-    def update_access(self, image_id: str) -> None:
-        """
-        Update access timestamp and count for an image.
-        
-        Args:
-            image_id: Image identifier
-        """
-        cursor = self.connection.cursor()
-        
-        cursor.execute("""
-            UPDATE images
-            SET last_accessed = ?,
-                access_count = access_count + 1
-            WHERE image_id = ?
-        """, (datetime.now(), image_id))
-        
-        self.connection.commit()
-    
     def image_exists(self, image_id: str) -> bool:
-        """
-        Check if image exists in database.
+        """Check if image exists in database
         
         Args:
-            image_id: Image identifier
+            image_id: Unique identifier for the image
             
         Returns:
-            True if exists, False otherwise
+            True if image exists, False otherwise
         """
-        cursor = self.connection.cursor()
+        cursor = self.conn.cursor()
         
         cursor.execute("""
             SELECT 1 FROM images WHERE image_id = ? LIMIT 1
@@ -206,39 +121,149 @@ class SQLiteStore:
         
         return cursor.fetchone() is not None
     
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get database statistics.
+    def count_images(self) -> int:
+        """Count total number of images in database
         
         Returns:
-            Statistics dictionary
+            Number of images
         """
-        cursor = self.connection.cursor()
+        cursor = self.conn.cursor()
         
+        cursor.execute("SELECT COUNT(*) FROM images")
+        
+        return cursor.fetchone()[0]
+    
+    def get_all_images(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
+        """Get all images from database
+        
+        Args:
+            limit: Maximum number of images to return (None = all)
+            offset: Number of images to skip
+            
+        Returns:
+            List of dictionaries with image metadata
+        """
+        cursor = self.conn.cursor()
+        
+        if limit is not None:
+            cursor.execute("""
+                SELECT * FROM images 
+                ORDER BY indexed_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+        else:
+            cursor.execute("""
+                SELECT * FROM images 
+                ORDER BY indexed_at DESC
+            """)
+        
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    
+    def update_access_stats(self, image_id: str):
+        """Update access statistics for an image
+        
+        Args:
+            image_id: Unique identifier for the image
+        """
+        cursor = self.conn.cursor()
+        now = datetime.now()
+        
+        cursor.execute("""
+            UPDATE images 
+            SET last_accessed = ?, 
+                access_count = access_count + 1
+            WHERE image_id = ?
+        """, (now, image_id))
+        
+        self.conn.commit()
+    
+    def delete_image(self, image_id: str) -> bool:
+        """Delete image metadata
+        
+        Args:
+            image_id: Unique identifier for the image
+            
+        Returns:
+            True if image was deleted, False if not found
+        """
+        cursor = self.conn.cursor()
+        
+        cursor.execute("""
+            DELETE FROM images WHERE image_id = ?
+        """, (image_id,))
+        
+        deleted = cursor.rowcount > 0
+        self.conn.commit()
+        
+        return deleted
+    
+    def search_by_filename(self, filename_pattern: str) -> List[Dict]:
+        """Search images by filename pattern
+        
+        Args:
+            filename_pattern: SQL LIKE pattern (e.g., 'beach%.jpg')
+            
+        Returns:
+            List of matching images
+        """
+        cursor = self.conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM images 
+            WHERE filename LIKE ?
+            ORDER BY indexed_at DESC
+        """, (filename_pattern,))
+        
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    
+    def get_stats(self) -> Dict:
+        """Get database statistics
+        
+        Returns:
+            Dictionary with statistics
+        """
+        cursor = self.conn.cursor()
+        
+        # Total images
         cursor.execute("SELECT COUNT(*) FROM images")
         total_images = cursor.fetchone()[0]
         
-        cursor.execute("SELECT embedding_model, COUNT(*) FROM images GROUP BY embedding_model")
-        models = {row[0]: row[1] for row in cursor.fetchall()}
+        # Total size
+        cursor.execute("SELECT SUM(file_size_bytes) FROM images")
+        total_bytes = cursor.fetchone()[0] or 0
+        
+        # Average dimensions
+        cursor.execute("""
+            SELECT AVG(width), AVG(height) 
+            FROM images 
+            WHERE width IS NOT NULL AND height IS NOT NULL
+        """)
+        avg_width, avg_height = cursor.fetchone()
+        
+        # Format distribution
+        cursor.execute("""
+            SELECT format, COUNT(*) as count 
+            FROM images 
+            GROUP BY format
+        """)
+        formats = {row[0]: row[1] for row in cursor.fetchall()}
         
         return {
-            "total_images": total_images,
-            "models": models
+            'total_images': total_images,
+            'total_size_bytes': total_bytes,
+            'total_size_mb': total_bytes / (1024 * 1024),
+            'avg_width': avg_width,
+            'avg_height': avg_height,
+            'formats': formats,
         }
     
-    def close(self) -> None:
+    def close(self):
         """Close database connection"""
-        if self.connection:
-            self.connection.close()
+        if self.conn:
+            self.conn.close()
     
-    def __enter__(self):
-        """Context manager entry"""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
+    def __del__(self):
+        """Destructor - ensure connection is closed"""
         self.close()
-
-
-# Add missing import
-from typing import Union

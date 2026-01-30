@@ -49,6 +49,21 @@ A local-first image analysis system that enables semantic search over personal p
 │  → Ranked Results                  │
 └────────────────────────────────────┘
 ```
+# To switch models: Just change 'active_model' in config.py
+# Then re-run: python run_batch_ingestion.py
+
+# 1. Delete both databases
+del databases\metadata.db
+rmdir /s databases\embeddings.lance
+
+# 2. Re-initialize databases
+python src\init_databases.py
+
+# 3. Re-run batch processing
+python run_batch_ingestion.py
+
+# 4. Verify (should show 100/100 match)
+python src\verify_batch.py
 
 ## Tech Stack
 
