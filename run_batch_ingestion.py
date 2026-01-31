@@ -11,7 +11,7 @@ Usage:
 Examples:
     python run_batch_ingestion.py --model clip
     python run_batch_ingestion.py --model mobileclip --skip-existing
-    python run_batch_ingestion.py --model clip --directory data/my_images
+    python run_batch_ingestion.py --model siglip --directory data/my_images
 """
 
 import sys
@@ -30,8 +30,8 @@ def main():
     """Main entry point for batch ingestion"""
 
     # Parse arguments
-    parser = argparse.ArgumentParser(description='Batch process images with CLIP or MobileCLIP')
-    parser.add_argument('--model', type=str, default='clip', choices=['clip', 'mobileclip'],
+    parser = argparse.ArgumentParser(description='Batch process images with CLIP, MobileCLIP, or SigLIP')
+    parser.add_argument('--model', type=str, default='clip', choices=['clip', 'mobileclip', 'siglip'],
                        help='Model to use for embeddings (default: clip)')
     parser.add_argument('--skip-existing', action='store_true',
                        help='Skip images already in database')

@@ -1,13 +1,14 @@
 """
-Run Batch Ingestion - Multi-Model Support
+Run Batch Ingestion - 3-Model Support
 
-Process images with CLIP or MobileCLIP.
+Process images with CLIP, MobileCLIP, or SigLIP.
 
 Phase 1 Day 2 - Image Analysis System v0.1
 
 Usage:
     python run_batch_ingestion.py --model clip
     python run_batch_ingestion.py --model mobileclip
+    python run_batch_ingestion.py --model siglip
 """
 
 import sys
@@ -28,7 +29,7 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Batch image ingestion')
     parser.add_argument('--model', type=str, default='clip', 
-                       choices=['clip', 'mobileclip'],
+                       choices=['clip', 'mobileclip', 'siglip'],
                        help='Model to use (default: clip)')
     parser.add_argument('--skip-existing', action='store_true',
                        help='Skip images already in database')
@@ -70,7 +71,8 @@ def main():
     
     # Confirm before processing
     print(f"\n⚠️  About to process {len(image_files)} images")
-    print(f"   Model: {args.model}")
+    print(f"   Model: {args.model.upper()}")
+    print(f"   Embedding dim: {config.embedding_dim}D")
     print(f"   Skip existing: {args.skip_existing}")
     print(f"   Database: {config.lance_path.name}")
     
@@ -104,7 +106,7 @@ def main():
             print(f"   LanceDB: {config.lance_path}")
             print("\nNext steps:")
             print(f"   1. Verify: python src/verify_batch.py")
-            print(f"   2. Compare models: python compare_models.py")
+            print(f"   2. Compare all models: python compare_all_models.py")
             sys.exit(0)
         else:
             print("\n⚠️  BATCH INGESTION COMPLETED WITH WARNINGS")

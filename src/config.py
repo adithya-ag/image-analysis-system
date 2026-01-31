@@ -1,7 +1,7 @@
 """
 Configuration Management - Multi-Model Support
 
-Handles model selection and paths for CLIP and MobileCLIP.
+Handles model selection and paths for CLIP, MobileCLIP, and SigLIP.
 
 Phase 1 Day 2 - Image Analysis System v0.1
 """
@@ -17,7 +17,7 @@ class Config:
         """Initialize configuration
         
         Args:
-            model_name: Name of model to use ('clip' or 'mobileclip')
+            model_name: Name of model to use ('clip', 'mobileclip', or 'siglip')
         """
         # Project paths
         self.project_root = Path(__file__).parent.parent
@@ -37,7 +37,7 @@ class Config:
         """Setup model-specific configuration
         
         Args:
-            model_name: Name of model ('clip' or 'mobileclip')
+            model_name: Name of model ('clip', 'mobileclip', or 'siglip')
         """
         if model_name == 'clip':
             self.model_class = 'CLIPOpenAI'
@@ -49,29 +49,46 @@ class Config:
             self.model_path = self.model_dir / 'mobileclip_s2'
             self.embedding_dim = 512
             
+        elif model_name == 'siglip':
+            self.model_class = 'SigLIP'
+            self.model_path = self.model_dir / 'siglip2_base' / 'model.onnx'
+            self.embedding_dim = 768
+            
         else:
-            raise ValueError(f"Unknown model: {model_name}. Use 'clip' or 'mobileclip'")
+            raise ValueError(f"Unknown model: {model_name}. Use 'clip', 'mobileclip', or 'siglip'")
         
         # Verify model exists
-        if model_name == 'clip' and not self.model_path.exists():
-            raise FileNotFoundError(f"CLIP model not found: {self.model_path}")
+        if model_name == 'clip':
+            if not self.model_path.exists():
+                raise FileNotFoundError(f"CLIP model not found: {self.model_path}")
+                
         elif model_name == 'mobileclip':
             img_encoder = self.model_path / 'mobileclip_image_encoder.onnx'
             if not img_encoder.exists():
                 raise FileNotFoundError(f"MobileCLIP not found: {img_encoder}")
+                
+        elif model_name == 'siglip':
+            if not self.model_path.exists():
+                raise FileNotFoundError(f"SigLIP model not found: {self.model_path}")
     
     def get_model_instance(self):
         """Get instance of the configured model
-        
+
         Returns:
             Instantiated model object
         """
         if self.model_class == 'CLIPOpenAI':
             from analysis.clip_openai import CLIPOpenAI
             return CLIPOpenAI(self)
+
         elif self.model_class == 'MobileCLIP':
             from analysis.mobileclip import MobileCLIP
             return MobileCLIP(self)
+
+        elif self.model_class == 'SigLIP':
+            from analysis.siglip import SigLIP
+            return SigLIP(self.model_path, self.model_name)
+
         else:
             raise ValueError(f"Unknown model class: {self.model_class}")
     
@@ -90,6 +107,10 @@ class Config:
         # Check MobileCLIP
         mobileclip_path = self.model_dir / 'mobileclip_s2' / 'mobileclip_image_encoder.onnx'
         models.append(('mobileclip', mobileclip_path.exists(), mobileclip_path))
+        
+        # Check SigLIP
+        siglip_path = self.model_dir / 'siglip2_base' / 'model.onnx'
+        models.append(('siglip', siglip_path.exists(), siglip_path))
         
         return models
     
