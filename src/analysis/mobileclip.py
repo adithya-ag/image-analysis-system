@@ -22,25 +22,25 @@ class MobileCLIP(EmbeddingModel):
     
     def __init__(self, config):
         """Initialize MobileCLIP model
-        
+
         Args:
             config: Configuration object with model paths
         """
         self.config = config
         self.model_name = config.model_name
-        
+
         # Model paths
         model_dir = config.model_dir / 'mobileclip_s2'
         self.image_encoder_path = model_dir / 'mobileclip_image_encoder.onnx'
         self.text_encoder_path = model_dir / 'mobileclip_text_encoder.onnx'
         self.metadata_path = model_dir / 'mobileclip_metadata.json'
-        
+
         # Verify files exist
         if not self.image_encoder_path.exists():
             raise FileNotFoundError(f"Image encoder not found: {self.image_encoder_path}")
         if not self.text_encoder_path.exists():
             raise FileNotFoundError(f"Text encoder not found: {self.text_encoder_path}")
-        
+
         # Load metadata
         if self.metadata_path.exists():
             with open(self.metadata_path, 'r') as f:
@@ -63,6 +63,10 @@ class MobileCLIP(EmbeddingModel):
         self.image_output_name = None
         self.text_input_name = None
         self.text_output_name = None
+
+        # Load CLIP tokenizer for text encoding (MobileCLIP is CLIP-compatible)
+        from transformers import CLIPTokenizer
+        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
 
         # Load models
         self.load_model()
@@ -146,27 +150,35 @@ class MobileCLIP(EmbeddingModel):
     
     def generate_text_embedding(self, text: str) -> np.ndarray:
         """Generate embedding for text query
-        
+
         Args:
             text: Text query string
-            
+
         Returns:
             Text embedding as numpy array (512D)
         """
-        # Simple tokenization (MobileCLIP uses basic tokenizer)
-        # Note: This is simplified - production would use proper tokenizer
-        tokens = self._simple_tokenize(text)
-        
+        # Tokenize using CLIP tokenizer (MobileCLIP is CLIP-compatible)
+        tokens = self.tokenizer(
+            text,
+            padding="max_length",
+            max_length=77,
+            truncation=True,
+            return_tensors="np"
+        )
+
+        # Get input_ids as int64
+        input_ids = tokens['input_ids'].astype(np.int64)
+
         # Run inference
         outputs = self.text_session.run(
             [self.text_output_name],
-            {self.text_input_name: tokens}
+            {self.text_input_name: input_ids}
         )
-        
+
         # Get embedding and normalize
         embedding = outputs[0][0]  # Remove batch dimension
         embedding = embedding / np.linalg.norm(embedding)  # L2 normalize
-        
+
         return embedding
     
     def _simple_tokenize(self, text: str, max_length: int = 77) -> np.ndarray:

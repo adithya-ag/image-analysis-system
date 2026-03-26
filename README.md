@@ -1,8 +1,8 @@
-# 🖼️ Local-First Image Analysis System
+# Local-First Image Analysis System
 
-**Version:** v0.1.0 (Embeddings-Only Semantic Search)  
-**Status:** 🚧 In Development - Phase 1  
-**License:** MIT  
+**Version:** v0.1.0 (Embeddings-Only Semantic Search)
+**Status:** Phase 1 Complete - Multi-Model Semantic Search
+**License:** MIT
 
 ## Overview
 
@@ -10,65 +10,59 @@ A local-first image analysis system that enables semantic search over personal p
 
 ### Current Capabilities (v0.1)
 
-- ✅ Image ingestion with unique ID generation
-- ✅ Embedding extraction using vision models (SmolVLM-500M, MobileCLIP-S2)
-- ✅ Hybrid storage (SQLite metadata + LanceDB vectors)
-- ✅ Semantic search via text queries
-- ✅ CLI interface
+- Image ingestion with unique ID generation
+- Embedding extraction using 3 vision models (CLIP, MobileCLIP, SigLIP)
+- Hybrid storage (SQLite metadata + LanceDB vectors)
+- Semantic text-to-image search
+- Multi-model comparison and benchmarking tools
+- ONNX Runtime inference with optional OpenVINO GPU acceleration
 
 ### Roadmap
 
-- **v0.2:** OCR, face detection, mood extraction
+- **v0.2:** OCR, face detection, mood extraction, CLIP text encoding via ONNX
 - **v0.3:** GUI, background processing, incremental updates
 - **v1.0:** Production release with Android support
 
 ## Architecture
 
 ```
-┌─────────────────┐
-│   CLI/GUI       │
-└────────┬────────┘
-         │
-┌────────▼────────────────────────────┐
-│         Core Engine                 │
-│  ┌──────────┐  ┌──────────────┐    │
-│  │ Ingestion│  │   Analysis   │    │
-│  │  Module  │→ │   Plugins    │    │
-│  └──────────┘  └──────┬───────┘    │
-│                       │             │
-│  ┌────────────────────▼───────────┐ │
-│  │      Storage Layer             │ │
-│  │  SQLite (metadata)             │ │
-│  │  LanceDB (vectors)             │ │
-│  └────────────────────┬───────────┘ │
-└────────────────────────┼────────────┘
-                         │
-┌────────────────────────▼───────────┐
-│      Retrieval & Search            │
-│  Text Query → Vector Search        │
-│  → Ranked Results                  │
-└────────────────────────────────────┘
+CLI / Scripts
+      │
+┌─────▼─────────────────────────────────┐
+│              Core Engine              │
+│  ┌────────────┐   ┌────────────────┐  │
+│  │ Ingestion  │ → │    Analysis    │  │
+│  │  Module    │   │   Plugins      │  │
+│  └────────────┘   └───────┬────────┘  │
+│                           │           │
+│  ┌────────────────────────▼────────┐  │
+│  │         Storage Layer           │  │
+│  │  SQLite (metadata.db)           │  │
+│  │  LanceDB (embeddings.lance)     │  │
+│  └────────────────────────┬────────┘  │
+└───────────────────────────┼───────────┘
+                            │
+┌───────────────────────────▼───────────┐
+│         Retrieval & Search            │
+│  Text Query → Embedding → Cosine      │
+│  Similarity → Ranked Results          │
+└───────────────────────────────────────┘
 ```
-# To switch models: Just change 'active_model' in config.py
-# Then re-run: python run_batch_ingestion.py
 
-# 1. Delete both databases
-del databases\metadata.db
-rmdir /s databases\embeddings.lance
+## Models
 
-# 2. Re-initialize databases
-python src\init_databases.py
+| Model | Embedding Dim | Image | Text | Notes |
+|-------|--------------|-------|------|-------|
+| CLIP ViT-B/32 | 512D | ✅ | ⚠️ PyTorch fallback | ONNX via optimum; text encoding uses PyTorch in search |
+| MobileCLIP-S2 | 512D | ✅ | ✅ | Dual ONNX encoders (image + text); lightest option |
+| SigLIP-2 Base | 768D | ✅ | ⚠️ Zero vector fallback | Combined ONNX model; text encoding in progress |
 
-# 3. Re-run batch processing
-python run_batch_ingestion.py
-
-# 4. Verify (should show 100/100 match)
-python src\verify_batch.py
+Active model is configured in `src/config.py` (`active_model` field).
 
 ## Tech Stack
 
 - **Language:** Python 3.11
-- **Vision Models:** SmolVLM-500M (primary), MobileCLIP-S2 (benchmark)
+- **Vision Models:** CLIP ViT-B/32, MobileCLIP-S2, SigLIP-2 Base
 - **ML Runtime:** ONNX Runtime + OpenVINO (Intel GPU acceleration)
 - **Databases:** SQLite + LanceDB
 - **Image Processing:** OpenCV + Pillow
@@ -90,65 +84,115 @@ git clone https://github.com/YOUR_USERNAME/image-analysis-system.git
 cd image-analysis-system
 
 # Create virtual environment
-python -m venv venv
+py -3.11 -m venv venv
 venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Download models
+# Install PyTorch CPU-only (separate step to avoid CUDA downloads)
+pip install torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu
+
+# Download and convert CLIP to ONNX
+pip install optimum[onnxruntime] onnx
 python scripts/setup_models.py
 
 # Initialize databases
 python src/init_databases.py
-```
 
-**Detailed setup instructions:** See [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)
+# Verify setup
+python scripts/verify_setup.py
+```
 
 ## Usage
 
 ### Index Images
 
 ```bash
-# Index a folder of images
-python src/ingest.py --folder "C:\Photos\Vacation2024"
+# Batch index a folder (uses active_model from config.py)
+python run_batch_ingestion.py
 ```
 
 ### Search
 
 ```bash
-# Search with text query
-python src/search.py --query "beach sunset"
+# Run semantic search with sample queries
+python test_search.py
 
-# Results:
-# 1. IMG_5432.jpg (score: 0.87)
-# 2. IMG_5433.jpg (score: 0.85)
-# 3. IMG_5401.jpg (score: 0.82)
+# Search a specific query programmatically
+python -c "
+from src.retrieval.search_engine import SearchEngine
+engine = SearchEngine('mobileclip')
+engine.search_and_display('beach sunset', top_k=5)
+"
 ```
 
-### Benchmark Models
+### Compare Models
 
 ```bash
-# Compare SmolVLM vs MobileCLIP performance
-python src/benchmark.py --folder "C:\Photos\TestSet"
+# Compare search quality across all models
+python compare_search_quality.py
+
+# Validate ONNX encoder outputs
+python test_onnx_encoders.py
+
+# Inspect MobileCLIP ONNX model structure
+python inspect_mobileclip_onnx.py
+```
+
+### Switch Active Model
+
+```python
+# In src/config.py, change:
+active_model = "mobileclip"  # Options: "clip", "mobileclip", "siglip"
+```
+
+Then re-index images with the new model:
+
+```bash
+# 1. Delete existing databases
+del databases\metadata.db
+rmdir /s databases\embeddings.lance
+
+# 2. Re-initialize
+python src\init_databases.py
+
+# 3. Re-run batch processing
+python run_batch_ingestion.py
 ```
 
 ## Project Structure
 
 ```
 image-analysis-system/
-├── src/                    # Source code
-│   ├── ingestion/         # Image ingestion module
-│   ├── analysis/          # Embedding extraction plugins
-│   ├── storage/           # Database interfaces
-│   └── retrieval/         # Search module
-├── scripts/               # Setup and utility scripts
-├── models/                # ONNX models (gitignored)
-├── databases/             # SQLite + LanceDB files (gitignored)
-├── data/                  # Test images (gitignored)
-├── tests/                 # Unit tests
-├── docs/                  # Documentation
-└── requirements.txt       # Python dependencies
+├── src/                        # Source code
+│   ├── analysis/               # Embedding model plugins
+│   │   ├── base.py             # Abstract EmbeddingModel interface
+│   │   ├── clip_openai.py      # CLIP ViT-B/32 (ONNX)
+│   │   ├── mobileclip.py       # MobileCLIP-S2 (dual ONNX)
+│   │   └── siglip.py           # SigLIP-2 Base (ONNX)
+│   ├── ingestion/              # Image loading and ID generation
+│   │   └── batch_processor.py  # Batch ingestion pipeline
+│   ├── storage/                # Database interfaces
+│   │   ├── sqlite_store.py     # SQLite metadata store
+│   │   └── lance_store.py      # LanceDB vector store
+│   ├── retrieval/              # Search module
+│   │   └── search_engine.py    # Text-to-image semantic search
+│   ├── config.py               # Multi-model configuration
+│   └── init_databases.py       # Database schema initialization
+├── scripts/                    # Setup and utility scripts
+│   ├── setup_models.py         # Download and convert CLIP to ONNX
+│   └── verify_setup.py         # Verify installation
+├── run_batch_ingestion.py      # CLI: batch index images
+├── test_search.py              # Test semantic search queries
+├── test_onnx_encoders.py       # Validate ONNX encoder outputs
+├── compare_search_quality.py   # Compare search across models
+├── inspect_mobileclip_onnx.py  # Inspect ONNX model structure
+├── models/                     # ONNX models (gitignored)
+├── databases/                  # SQLite + LanceDB files (gitignored)
+├── data/                       # Test images (gitignored)
+├── tests/                      # Unit tests
+└── requirements.txt            # Python dependencies
 ```
 
 ## Development
@@ -165,6 +209,8 @@ image-analysis-system/
 
 ```bash
 pytest tests/
+python test_onnx_encoders.py
+python test_search.py
 ```
 
 ### Code Style
@@ -181,16 +227,15 @@ flake8 src/
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| Embedding generation | <1s per image | 🚧 Testing |
-| Search latency | <500ms for 10K images | 🚧 Testing |
-| Memory usage | <4GB during indexing | 🚧 Testing |
-| Accuracy (beach sunset) | >80% relevant results | 🚧 Testing |
+| Embedding generation | <1s per image | Testing |
+| Search latency | <500ms for 10K images | Testing |
+| Memory usage | <4GB during indexing | Testing |
+| Accuracy (beach sunset) | >80% relevant results | Testing |
 
 ## Documentation
 
 - [Setup Instructions](SETUP_INSTRUCTIONS.md) - Detailed installation guide
 - [Architecture Document](docs/Strategic_Architecture.md) - High-level design
-- [API Reference](docs/API.md) - Module interfaces (coming soon)
 
 ## Contributing
 
@@ -207,14 +252,12 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ## Acknowledgments
 
-- SmolVLM-500M by HuggingFace
+- CLIP ViT-B/32 by OpenAI
 - MobileCLIP by Apple
+- SigLIP-2 by Google
 - LanceDB vector database
+- HuggingFace Transformers & Optimum
 
 ## Contact
 
 For questions or collaboration: [Add contact info]
-
----
-
-**Status:** 🚧 Phase 1 in progress - Foundation & Core Pipeline (Days 1-4/7)

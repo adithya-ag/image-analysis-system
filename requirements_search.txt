@@ -1,0 +1,8 @@
+# Additional dependencies for search functionality
+# Install with: pip install -r requirements_search.txt
+
+transformers>=4.35.0
+torch>=2.0.0
+
+# Note: These will download ~500MB of models on first run
+# Models are cached locally for subsequent use
